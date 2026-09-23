@@ -122,8 +122,6 @@ export function emulateFailure(
   failIds: string[]
 ): { path: string[]; cost: number; failed: string[] } {
   const failed = new Set(failIds);
-  const before = dijkstraPath(nodes, links, from, to);
-  void before;
   const failedNodes: Record<string, TopoNode> = { ...nodes };
   for (const id of failed) {
     const n = failedNodes[id];

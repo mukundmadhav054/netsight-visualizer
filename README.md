@@ -17,13 +17,13 @@ Interactive network topology visualizer: Vite + React 18 + TypeScript (strict) c
 
 Client:
 
-```sh
+```powershell
 npm install; npm run build; npm run test -- --run
 ```
 
 Server:
 
-```sh
+```powershell
 npm install; npm run build; npm start   # WS on :4001
 ```
 
