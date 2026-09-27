@@ -8,12 +8,11 @@ services:
   - type: web
     name: netsight-server
     runtime: node
+    plan: free
     rootDir: server
     buildCommand: npm install && npm run build
     startCommand: npm start
     healthCheckPath: /healthz
-    scaling:
-      numInstances: 1
 
   - type: web
     name: netsight-client
