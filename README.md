@@ -29,6 +29,10 @@ npm install; npm run build; npm start   # WS on :4001
 
 ## Perf design notes
 
+Measured numbers live in `benchmarks/RESULTS.md` — produced by the
+checked-in harnesses (`server/bench-ws.mjs`, `client/bench-fps.mjs`),
+never estimated.
+
 - Normalized Zustand entities → heartbeat deltas update only affected nodes; no full-canvas remount (React Flow nodes keyed by id).
 - Edge utilization painted on a `<canvas>` overlay (`pointer-events: none`) so pan/zoom doesn't recreate SVG edges per tick.
 - Server sends changed entities only (per-field fingerprint diff) with `seq` ordering; client drops stale/duplicate packets and flushes buffered packets on an interval.
