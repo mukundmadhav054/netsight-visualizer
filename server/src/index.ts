@@ -1,3 +1,4 @@
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { WebSocketServer, type WebSocket } from "ws";
 import { diffDelta, startHeartbeat, broadcastDelta } from "./ws/broadcast";
 import { generateTopology, mulberry32, tickTopology } from "./sim/generator";
@@ -8,7 +9,19 @@ const topo = generateTopology(520, 42);
 const rand = mulberry32(1337);
 let seq = 0;
 
-const wss = new WebSocketServer({ port: PORT });
+// Plain HTTP layer: Render health checks hit /healthz (expects 200).
+// Everything else 404s; WebSocket upgrades are handled by `ws` below.
+const httpServer = createServer((req: IncomingMessage, res: ServerResponse) => {
+  if (req.url === "/healthz") {
+    res.writeHead(200, { "content-type": "application/json" });
+    res.end(JSON.stringify({ status: "ok", seq }));
+    return;
+  }
+  res.writeHead(404);
+  res.end();
+});
+
+const wss = new WebSocketServer({ server: httpServer });
 
 wss.on("connection", (ws: WebSocket) => {
   // Full snapshot on connect (seq 0), then deltas.
@@ -53,4 +66,5 @@ setInterval(() => {
 }, 1000);
 
 // eslint-disable-next-line no-console
-console.log(`netsight-server listening on ws://localhost:${PORT}`);
+console.log(`netsight-server listening on port ${PORT}`);
+httpServer.listen(PORT);

@@ -5,10 +5,12 @@ import TelemetryGraph from "./components/TelemetryGraph";
 import { Card, Button } from "./components/DesignSystem";
 import { useTopologyStream } from "./hooks/useTopologyStream";
 import { useGraphStore } from "./store/graphStore";
+import { resolveWsUrl } from "./utils/wsUrl";
 
-const WS_URL =
+const WS_URL = resolveWsUrl(
   (import.meta as unknown as { env: Record<string, string | undefined> }).env
-    ?.VITE_TOPOLOGY_WS ?? "ws://localhost:4001";
+    ?.VITE_TOPOLOGY_WS
+);
 
 export default function App() {
   const { status, buffered } = useTopologyStream(WS_URL);

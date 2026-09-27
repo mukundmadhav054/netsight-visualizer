@@ -1,0 +1,29 @@
+# Render Blueprint: NetSight Visualizer (WS daemon + static client)
+# Dashboard: New → Blueprint → select mukundmadhav054/netsight-visualizer → Apply.
+# The client build picks up the server's public host automatically via
+# fromService (Vite bakes VITE_TOPOLOGY_WS in at build time; the resolver in
+# client/src/utils/wsUrl.ts upgrades the bare host to wss://).
+
+services:
+  - type: web
+    name: netsight-server
+    runtime: node
+    rootDir: server
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /healthz
+    scaling:
+      numInstances: 1
+
+  - type: web
+    name: netsight-client
+    runtime: static
+    rootDir: client
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_TOPOLOGY_WS
+        fromService:
+          type: web
+          name: netsight-server
+          property: host
