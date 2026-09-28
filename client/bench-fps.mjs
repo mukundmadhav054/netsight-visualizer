@@ -177,13 +177,39 @@ try {
   const viewportTransform = () =>
     page.evaluate(() => document.querySelector(".react-flow__viewport")?.style.transform ?? "none");
   const transformBefore = await viewportTransform();
+  // Drag from a genuinely empty pixel near pane center (else we'd grab a
+  // node and only exercise node-drag). Scan a grid for points outside any
+  // node box and take the one closest to center, leaving room to sweep.
+  const empty = await page.evaluate(() => {
+    const pane = document.querySelector(".react-flow");
+    const r = pane.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    let best = null;
+    let bestD = Infinity;
+    for (let y = r.top + 60; y < r.bottom - 40; y += 40) {
+      for (let x = r.left + 60; x < r.right - 40; x += 40) {
+        const el = document.elementFromPoint(x, y);
+        if (el && !el.closest(".react-flow__node")) {
+          const d = Math.hypot(x - cx, y - cy);
+          if (d < bestD && x - 150 > r.left && x + 150 < r.right) {
+            bestD = d;
+            best = { x, y };
+          }
+        }
+      }
+    }
+    return best;
+  });
   const interacting = sampleFrames(page, 9000);
-  for (let d = 0; d < 3; d++) {
-    await page.mouse.move(cx - 250, cy);
-    await page.mouse.down();
-    await page.mouse.move(cx + 250, cy + 120, { steps: 25 });
-    await page.mouse.up();
-    await sleep(250);
+  if (empty) {
+    for (let d = 0; d < 3; d++) {
+      await page.mouse.move(empty.x - 150, empty.y - 60);
+      await page.mouse.down();
+      await page.mouse.move(empty.x + 150, empty.y + 60, { steps: 25 });
+      await page.mouse.up();
+      await sleep(250);
+    }
   }
   await page.mouse.move(cx, cy);
   for (let z = 0; z < 8; z++) {
@@ -213,6 +239,7 @@ try {
         panZoom9s: { ...busy, fps: fps(busy) },
         viewportTransformBefore: transformBefore,
         viewportTransformAfter: transformAfter,
+        dragOrigin: empty,
         longtasks,
       },
       null,

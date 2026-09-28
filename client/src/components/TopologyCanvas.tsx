@@ -58,7 +58,7 @@ const DeviceNode = memo(function DeviceNode({
       role="button"
       tabIndex={0}
       aria-label={`${data.kind} ${data.label}, status ${data.status}`}
-      className={`flex flex-col items-center rounded border-2 bg-slate-900 px-2 py-1 ${
+      className={`flex flex-col items-center rounded border-2 bg-white px-2 py-1 dark:bg-slate-900 ${
         statusRing[data.status] ?? "border-slate-600"
       } ${selected ? "ring-2 ring-sky-400" : ""}`}
     >
@@ -70,7 +70,7 @@ const DeviceNode = memo(function DeviceNode({
       ) : (
         <HostGlyph />
       )}
-      <span className="mt-1 max-w-[90px] truncate text-[10px] text-slate-200">
+      <span className="mt-1 max-w-[90px] truncate text-[10px] text-slate-700 dark:text-slate-200">
         {data.label}
       </span>
       <Handle type="source" position={Position.Bottom} />
@@ -93,7 +93,7 @@ const nodeTypes: NodeTypes = {
  *   none) instead of re-creating SVG edge elements on every tick; pan/zoom
  *   only moves the overlay transform.
  */
-export default function TopologyCanvas() {
+export default function TopologyCanvas({ dark = true }: { dark?: boolean }) {
   // Subscribe to id lists (stable unless membership changes) ...
   const nodeIds = useGraphStore((s) => Object.keys(s.nodes));
   const nodesById = useGraphStore((s) => s.nodes);
@@ -181,7 +181,7 @@ export default function TopologyCanvas() {
         minZoom={0.2}
         proOptions={{ hideAttribution: true }}
       >
-        <Background />
+        <Background color={dark ? "#1e293b" : "#94a3b8"} />
         <Controls />
       </ReactFlow>
       {/* Utilization overlay: canvas layer above the flow, below controls. */}

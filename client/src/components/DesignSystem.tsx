@@ -16,9 +16,9 @@ export function Card({
     <section
       id={id}
       aria-label={title}
-      className="rounded-lg border border-slate-800 bg-slate-900 p-3"
+      className="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900"
     >
-      <h2 className="mb-2 text-sm font-medium text-slate-300">{title}</h2>
+      <h2 className="mb-2 text-sm font-medium text-slate-600 dark:text-slate-300">{title}</h2>
       {children}
     </section>
   );
@@ -39,8 +39,8 @@ export function Button({
     variant === "primary"
       ? "bg-sky-600 hover:bg-sky-500 text-white"
       : variant === "danger"
-        ? "bg-red-700 hover:bg-red-600 text-white"
-        : "bg-slate-800 hover:bg-slate-700 text-slate-100";
+        ? "bg-red-600 hover:bg-red-500 text-white dark:bg-red-700 dark:hover:bg-red-600"
+        : "bg-slate-200 hover:bg-slate-300 text-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-100";
   return (
     <button
       aria-label={ariaLabel}
@@ -60,10 +60,10 @@ export function Badge({
   children: ReactNode;
 }) {
   const tones: Record<string, string> = {
-    info: "bg-sky-900 text-sky-200",
-    ok: "bg-emerald-900 text-emerald-200",
-    warn: "bg-amber-900 text-amber-200",
-    bad: "bg-red-900 text-red-200"
+    info: "bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200",
+    ok: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200",
+    warn: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
+    bad: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
   };
   return (
     <span
@@ -79,7 +79,7 @@ export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
       {...props}
-      className="w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
+      className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
     />
   );
 }
@@ -88,7 +88,7 @@ export function SelectEl(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
       {...props}
-      className="w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400"
+      className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100"
     />
   );
 }
@@ -105,7 +105,7 @@ export function Tooltip({
       {children}
       <span
         role="tooltip"
-        className="pointer-events-none absolute -top-8 left-1/2 hidden -translate-x-1/2 whitespace-nowrap rounded bg-slate-700 px-2 py-1 text-xs group-focus:block group-hover:block"
+        className="pointer-events-none absolute -top-8 left-1/2 hidden -translate-x-1/2 whitespace-nowrap rounded bg-slate-800 px-2 py-1 text-xs text-slate-50 group-focus:block group-hover:block dark:bg-slate-700"
       >
         {label}
       </span>
@@ -133,10 +133,10 @@ export function Alert({
       role="alert"
       className={`rounded border px-3 py-2 text-sm ${
         tone === "bad"
-          ? "border-red-700 bg-red-950 text-red-200"
+          ? "border-red-300 bg-red-50 text-red-900 dark:border-red-700 dark:bg-red-950 dark:text-red-200"
           : tone === "warn"
-            ? "border-amber-700 bg-amber-950 text-amber-200"
-            : "border-sky-700 bg-sky-950 text-sky-200"
+            ? "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200"
+            : "border-sky-300 bg-sky-50 text-sky-900 dark:border-sky-700 dark:bg-sky-950 dark:text-sky-200"
       }`}
     >
       {children}
@@ -158,7 +158,7 @@ export function Progress({
       aria-valuenow={Math.round(value)}
       aria-valuemin={0}
       aria-valuemax={100}
-      className="h-2 w-full overflow-hidden rounded bg-slate-800"
+      className="h-2 w-full overflow-hidden rounded bg-slate-200 dark:bg-slate-800"
     >
       <div className="h-full bg-sky-500" style={{ width: `${value}%` }} />
     </div>
@@ -183,7 +183,9 @@ export function Tabs({
           aria-selected={t === active}
           onClick={() => onChange(t)}
           className={`rounded px-3 py-1 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-400 ${
-            t === active ? "bg-sky-700 text-white" : "bg-slate-800 text-slate-300"
+            t === active
+              ? "bg-sky-600 text-white dark:bg-sky-700"
+              : "bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300"
           }`}
         >
           {t}
@@ -195,7 +197,7 @@ export function Tabs({
 
 export function EmptyState({ message }: { message: string }) {
   return (
-    <p className="py-6 text-center text-sm text-slate-400" role="status">
+    <p className="py-6 text-center text-sm text-slate-500 dark:text-slate-400" role="status">
       {message}
     </p>
   );
@@ -203,9 +205,9 @@ export function EmptyState({ message }: { message: string }) {
 
 export function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded bg-slate-950 p-2">
-      <dt className="text-xs text-slate-400">{label}</dt>
-      <dd className="text-sm font-medium">{value}</dd>
+    <div className="rounded bg-slate-100 dark:bg-slate-950 p-2">
+      <dt className="text-xs text-slate-500 dark:text-slate-400">{label}</dt>
+      <dd className="text-sm font-medium text-slate-900 dark:text-slate-100">{value}</dd>
     </div>
   );
 }

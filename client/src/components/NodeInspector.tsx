@@ -49,7 +49,7 @@ export default function NodeInspector({ nodeId }: { nodeId: string | null }) {
         </Button>
       </div>
       <div className="mt-3">
-        <label htmlFor="route-target" className="text-xs text-slate-400">
+        <label htmlFor="route-target" className="text-xs text-slate-500 dark:text-slate-400">
           OSPF route target (node id)
         </label>
         <TextInput
@@ -59,7 +59,7 @@ export default function NodeInspector({ nodeId }: { nodeId: string | null }) {
           placeholder="e.g. sw-042"
         />
         {route && (
-          <p className="mt-1 text-xs text-slate-300" aria-live="polite">
+          <p className="mt-1 text-xs text-slate-700 dark:text-slate-300" aria-live="polite">
             {route.path.length > 0
               ? `Path (${route.cost.toFixed(1)}): ${route.path.join(" → ")}`
               : "No route — target unreachable under current failures."}
