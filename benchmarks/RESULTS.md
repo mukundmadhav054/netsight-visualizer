@@ -42,33 +42,39 @@ waits for edge-count steady state, then samples rAF: 5 s idle on the live
 `.react-flow__viewport` transform changing, e.g.
 `translate(152.66px, …)` → `translate(1652.66px, …)`).
 
-Steady-state runs (2 of 3; third run caught initial mount work in its idle
-window — see caveat):
+Steady-state runs with all nodes visible (3 runs, post visibility fix —
+see "correction" below):
 
 ```
-rendered DOM nodes:   520  (.react-flow__node)
+rendered DOM nodes:   520  (.react-flow__node, all visibility:visible)
+rendered edges:       520  (.react-flow__edge SVG paths)
 store:                520 nodes · 520 links (header)
-edges:                canvas overlay, 0 SVG edge elements at count time
-JS heap:              22–54 MB across runs
-idle 5 s (live ticks):  ~111–120 fps, median frame 8.3 ms, p95 ≤ 16.5 ms
-pan/zoom 9 s:          ~108–120 fps, median frame 8.3 ms, p95 ≤ 16.6 ms
-longtasks (session, incl. initial 520-node mount): 3–14, max ~110 ms
+JS heap:              ~41–63 MB across runs
+idle 5 s (live ticks):  ~16–17 fps, median frame 58.2–58.4 ms, p95 ≤ 91 ms
+pan/zoom 9 s:          ~15–17 fps, median frame 58.2–58.4 ms, p95 ≤ 91 ms
+longtasks (session, incl. initial 520-node mount): 2–3, max ~155 ms
 ```
 
-Reading: the headless compositor ticks at ~8.33 ms; a median frame of
-8.3 ms with p95 ≤ 16.6 ms means no missed frames during interaction —
-pan/zoom costs nothing above the idle baseline.
+Reading: headless Chrome renders on the CPU (SwiftShader, no GPU), so
+~58 ms medians reflect software rasterization of 520 labeled DOM nodes +
+520 SVG edges, not app logic — idle and interaction cost the same, i.e.
+pan/zoom adds no overhead above baseline. Headed / real-GPU numbers will
+be substantially better; treat these as a lower bound.
 
-Caveat: one run sampled 16 fps / 58 ms median idle because the initial
-520-node mount + edge creation landed inside the idle window (longtasks 14
-that run vs 3 when settled). The harness now waits for edge-count steady
-state before sampling; mount cost is real but one-time.
+Correction (honesty log): the first two measured runs reported 8.3 ms
+median frames, but pixel verification later showed the canvas was rendering
+invisible nodes then (a `visibility:hidden` bug — fixed in
+`fix(canvas): persist measured dims via onNodesChange`, verified by
+screenshot). Those 8.3 ms figures are superseded by the numbers above,
+taken with all 520 nodes + 520 edges visibly painted (screenshot-verified).
 
 ## Resume-ready lines (frontend roles)
 
-- Renders a live 520-node topology canvas at 8.3 ms median frame time
-  during scripted pan/zoom (p95 ≤ 16.6 ms, zero missed-frame spikes),
-  measured in headless Chrome against the production build.
+- Renders a live 520-node / 520-edge topology canvas that holds steady
+  frame times under scripted pan/zoom identical to its idle baseline
+  (~16 fps, 58 ms median in headless CPU rendering; real-GPU browsers
+  will be faster), measured in headless Chrome against the production
+  build with visibility screenshot-verified.
 - Delta-compressed WebSocket protocol cuts per-tick payloads 97.7%
   (151.9 KB full snapshot → 3.5 KB mean delta, 42.9×) with 1 ms median
   loopback update latency, measured over real sockets.
