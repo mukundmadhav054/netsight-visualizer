@@ -39,6 +39,50 @@ export interface GraphDelta {
   linksRemove?: string[];
 }
 
+/** Field-equality for server-owned node fields (dims handled separately). */
+function topoNodeFieldsEqual(a: TopoNode, b: TopoNode): boolean {
+  return (
+    a.id === b.id &&
+    a.label === b.label &&
+    a.kind === b.kind &&
+    a.x === b.x &&
+    a.y === b.y &&
+    a.status === b.status &&
+    a.load === b.load &&
+    a.updatedAt === b.updatedAt
+  );
+}
+
+/** Merge an incoming node onto the previous entity, preserving measured dims
+ * the server never sends. Returns the PREVIOUS reference when field-equal so
+ * per-tick heartbeats don't churn memoized subscribers. */
+function mergeNode(prev: TopoNode | undefined, next: TopoNode): TopoNode {
+  if (prev === undefined) return next;
+  const width = next.width ?? prev.width;
+  const height = next.height ?? prev.height;
+  if (topoNodeFieldsEqual(prev, next) && prev.width === width && prev.height === height) {
+    return prev;
+  }
+  return { ...next, width, height };
+}
+
+function topoLinkFieldsEqual(a: TopoLink, b: TopoLink): boolean {
+  return (
+    a.id === b.id &&
+    a.source === b.source &&
+    a.target === b.target &&
+    a.weight === b.weight &&
+    a.status === b.status &&
+    a.utilization === b.utilization
+  );
+}
+
+/** Identity-preserving link merge (same contract as mergeNode, minus dims). */
+function mergeLink(prev: TopoLink | undefined, next: TopoLink): TopoLink {
+  if (prev === undefined || !topoLinkFieldsEqual(prev, next)) return next;
+  return prev;
+}
+
 interface GraphState {
   nodes: Record<string, TopoNode>;
   links: Record<string, TopoLink>;
@@ -68,15 +112,17 @@ export const useGraphStore = create<GraphState>((set, get) => ({
 
   upsertNodes: (nodes) =>
     set((s) => {
-      const next = { ...s.nodes };
+      let next: Record<string, TopoNode> | null = null;
       for (const n of nodes) {
-        const prev = next[n.id];
-        next[n.id] =
-          prev !== undefined && n.width === undefined
-            ? { ...n, width: prev.width, height: prev.height }
-            : n;
+        const cur = (next ?? s.nodes)[n.id];
+        const merged = mergeNode(cur, n);
+        if (merged !== cur) {
+          if (!next) next = { ...s.nodes };
+          next[n.id] = merged;
+        }
       }
-      return { nodes: next };
+      // Nothing changed: return same state so subscribers aren't notified.
+      return next === null ? s : { nodes: next };
     }),
 
   removeNodes: (ids) =>
@@ -94,9 +140,16 @@ export const useGraphStore = create<GraphState>((set, get) => ({
 
   upsertLinks: (links) =>
     set((s) => {
-      const next = { ...s.links };
-      for (const l of links) next[l.id] = l;
-      return { links: next };
+      let next: Record<string, TopoLink> | null = null;
+      for (const l of links) {
+        const cur = (next ?? s.links)[l.id];
+        const merged = mergeLink(cur, l);
+        if (merged !== cur) {
+          if (!next) next = { ...s.links };
+          next[l.id] = merged;
+        }
+      }
+      return next === null ? s : { links: next };
     }),
 
   removeLinks: (ids) =>
@@ -110,18 +163,52 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     const { lastSeq } = get();
     if (delta.seq <= lastSeq) return false; // stale / duplicate
     set((s) => {
-      const nodes = { ...s.nodes };
-      for (const n of delta.nodesUpsert ?? []) {
-        const prev = nodes[n.id];
-        nodes[n.id] =
-          prev !== undefined && n.width === undefined
-            ? { ...n, width: prev.width, height: prev.height }
-            : n;
+      let nodes = s.nodes;
+      let links = s.links;
+      if (delta.nodesUpsert !== undefined && delta.nodesUpsert.length > 0) {
+        let next: Record<string, TopoNode> | null = null;
+        for (const n of delta.nodesUpsert) {
+          const cur = (next ?? nodes)[n.id];
+          const merged = mergeNode(cur, n);
+          if (merged !== cur) {
+            if (!next) next = { ...nodes };
+            next[n.id] = merged;
+          }
+        }
+        if (next) nodes = next;
       }
-      for (const id of delta.nodesRemove ?? []) delete nodes[id];
-      const links = { ...s.links };
-      for (const l of delta.linksUpsert ?? []) links[l.id] = l;
-      for (const id of delta.linksRemove ?? []) delete links[id];
+      if (delta.nodesRemove !== undefined && delta.nodesRemove.length > 0) {
+        const doomed = delta.nodesRemove.filter((id) => nodes[id] !== undefined);
+        if (doomed.length > 0) {
+          // `nodes` is already a private copy when an upsert ran above.
+          const next = nodes === s.nodes ? { ...nodes } : nodes;
+          for (const id of doomed) delete next[id];
+          nodes = next;
+        }
+      }
+      if (delta.linksUpsert !== undefined && delta.linksUpsert.length > 0) {
+        let next: Record<string, TopoLink> | null = null;
+        for (const l of delta.linksUpsert) {
+          const cur = (next ?? links)[l.id];
+          const merged = mergeLink(cur, l);
+          if (merged !== cur) {
+            if (!next) next = { ...links };
+            next[l.id] = merged;
+          }
+        }
+        if (next) links = next;
+      }
+      if (delta.linksRemove !== undefined && delta.linksRemove.length > 0) {
+        const doomed = delta.linksRemove.filter((id) => links[id] !== undefined);
+        if (doomed.length > 0) {
+          const next = links === s.links ? { ...links } : links;
+          for (const id of doomed) delete next[id];
+          links = next;
+        }
+      }
+      // No entity changed: keep nodes/links refs (no subscriber churn) and
+      // only advance the sequence guard.
+      if (nodes === s.nodes && links === s.links) return { lastSeq: delta.seq };
       return { nodes, links, lastSeq: delta.seq };
     });
     return true;

@@ -82,4 +82,43 @@ describe("graphStore reducers", () => {
     expect(n?.x).toBe(1);
     expect(n).toBeDefined();
   });
+
+  it("preserves entity identity for unchanged nodes across upserts and deltas", () => {
+    const s = useGraphStore.getState();
+    s.upsertNodes([node("a"), node("b")]);
+    const before = useGraphStore.getState().nodes;
+    const aBefore = before["a"];
+    const bBefore = before["b"];
+    // Fresh objects, same fields: refs (and the map) must survive.
+    s.upsertNodes([{ ...node("a") }, { ...node("b") }]);
+    const after = useGraphStore.getState().nodes;
+    expect(after).toBe(before);
+    expect(after["a"]).toBe(aBefore);
+    expect(after["b"]).toBe(bBefore);
+    // Empty delta advances the seq guard but keeps entity refs.
+    expect(s.applyDelta({ seq: 1 })).toBe(true);
+    const st = useGraphStore.getState();
+    expect(st.lastSeq).toBe(1);
+    expect(st.nodes).toBe(before);
+    expect(st.nodes["a"]).toBe(aBefore);
+    // Delta repeating identical content also changes nothing.
+    expect(s.applyDelta({ seq: 2, nodesUpsert: [{ ...node("a") }, { ...node("b") }] })).toBe(
+      true
+    );
+    expect(useGraphStore.getState().nodes).toBe(before);
+    // Stale/duplicate packets are still dropped.
+    expect(s.applyDelta({ seq: 2, nodesUpsert: [{ ...node("a"), x: 999 }] })).toBe(false);
+    expect(useGraphStore.getState().nodes["a"]?.x).toBe(1);
+  });
+
+  it("changed nodes get new refs while untouched siblings keep identity", () => {
+    const s = useGraphStore.getState();
+    s.upsertNodes([node("a"), node("b")]);
+    const bBefore = useGraphStore.getState().nodes["b"];
+    s.applyDelta({ seq: 1, nodesUpsert: [{ ...node("a"), x: 10, load: 0.9 }] });
+    const st = useGraphStore.getState();
+    expect(st.nodes["a"]?.x).toBe(10);
+    expect(st.nodes["a"]?.load).toBe(0.9);
+    expect(st.nodes["b"]).toBe(bBefore);
+  });
 });
