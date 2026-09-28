@@ -177,39 +177,50 @@ try {
   const viewportTransform = () =>
     page.evaluate(() => document.querySelector(".react-flow__viewport")?.style.transform ?? "none");
   const transformBefore = await viewportTransform();
-  // Drag from a genuinely empty pixel near pane center (else we'd grab a
-  // node and only exercise node-drag). Scan a grid for points outside any
-  // node box and take the one closest to center, leaving room to sweep.
-  const empty = await page.evaluate(() => {
-    const pane = document.querySelector(".react-flow");
-    const r = pane.getBoundingClientRect();
-    const cx = r.left + r.width / 2;
-    const cy = r.top + r.height / 2;
-    let best = null;
-    let bestD = Infinity;
-    for (let y = r.top + 60; y < r.bottom - 40; y += 40) {
-      for (let x = r.left + 60; x < r.right - 40; x += 40) {
-        const el = document.elementFromPoint(x, y);
-        if (el && !el.closest(".react-flow__node")) {
-          const d = Math.hypot(x - cx, y - cy);
-          if (d < bestD && x - 150 > r.left && x + 150 < r.right) {
-            bestD = d;
-            best = { x, y };
+  // Find a drag START pixel that is itself pane background (no node/edge
+  // under it). React Flow nodes carry class `nopan` and start their own
+  // d3-drag, which steals any gesture that begins on them — the old code
+  // checked an "empty" pixel but started the drag 150px away on an
+  // unchecked pixel that lands on a node, so the viewport never panned.
+  const SWEEP_DX = 300;
+  const SWEEP_DY = 120;
+  const findPanStart = () =>
+    page.evaluate(
+      ([dx, dy]) => {
+        const pane = document.querySelector(".react-flow");
+        const r = pane.getBoundingClientRect();
+        const cx = r.left + r.width / 2;
+        const cy = r.top + r.height / 2;
+        let best = null;
+        let bestD = Infinity;
+        for (let y = r.top + 40; y + dy < r.bottom - 40; y += 20) {
+          for (let x = r.left + 40; x + dx < r.right - 40; x += 20) {
+            const el = document.elementFromPoint(x, y);
+            if (el && !el.closest(".react-flow__node, .react-flow__edge")) {
+              const d = Math.hypot(x - cx, y - cy);
+              if (d < bestD) {
+                bestD = d;
+                best = { x: Math.round(x), y: Math.round(y) };
+              }
+            }
           }
         }
-      }
-    }
-    return best;
-  });
+        return best;
+      },
+      [SWEEP_DX, SWEEP_DY]
+    );
   const interacting = sampleFrames(page, 9000);
-  if (empty) {
-    for (let d = 0; d < 3; d++) {
-      await page.mouse.move(empty.x - 150, empty.y - 60);
-      await page.mouse.down();
-      await page.mouse.move(empty.x + 150, empty.y + 60, { steps: 25 });
-      await page.mouse.up();
-      await sleep(250);
-    }
+  let dragOrigin = null;
+  for (let d = 0; d < 3; d++) {
+    // Re-scan before each drag: the previous pan moved content under the old pixel.
+    const s = await findPanStart();
+    if (!s) break;
+    if (!dragOrigin) dragOrigin = s;
+    await page.mouse.move(s.x, s.y);
+    await page.mouse.down();
+    await page.mouse.move(s.x + SWEEP_DX, s.y + SWEEP_DY, { steps: 25 });
+    await page.mouse.up();
+    await sleep(250);
   }
   await page.mouse.move(cx, cy);
   for (let z = 0; z < 8; z++) {
@@ -239,7 +250,7 @@ try {
         panZoom9s: { ...busy, fps: fps(busy) },
         viewportTransformBefore: transformBefore,
         viewportTransformAfter: transformAfter,
-        dragOrigin: empty,
+        dragOrigin,
         longtasks,
       },
       null,
