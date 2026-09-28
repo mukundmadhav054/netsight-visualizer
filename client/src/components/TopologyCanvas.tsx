@@ -99,6 +99,8 @@ export default function TopologyCanvas() {
   const nodesById = useGraphStore((s) => s.nodes);
   const linksById = useGraphStore((s) => s.links);
   const selectNode = useGraphStore((s) => s.selectNode);
+  const selectedNodeId = useGraphStore((s) => s.selectedNodeId);
+  const applyNodeChanges = useGraphStore((s) => s.applyNodeChanges);
   const overlayRef = useRef<HTMLCanvasElement>(null);
 
   const flowNodes: Node[] = useMemo(
@@ -110,10 +112,15 @@ export default function TopologyCanvas() {
           type: "device",
           position: { x: n.x, y: n.y },
           data: { label: n.label, kind: n.kind, status: n.status },
+          // Measured dims unhide nodes (React Flow keeps dim-less nodes
+          // visibility:hidden); selection ring follows the store.
+          width: n.width,
+          height: n.height,
+          selected: id === selectedNodeId,
           ariaLabel: `${n.kind} ${n.label}`
         };
       }),
-    [nodeIds, nodesById]
+    [nodeIds, nodesById, selectedNodeId]
   );
 
   const flowEdges: Edge[] = useMemo(
@@ -169,6 +176,7 @@ export default function TopologyCanvas() {
         edges={flowEdges}
         nodeTypes={nodeTypes}
         onNodeClick={(_e, n) => selectNode(n.id)}
+        onNodesChange={applyNodeChanges}
         fitView
         minZoom={0.2}
         proOptions={{ hideAttribution: true }}
