@@ -96,8 +96,10 @@ interface GraphState {
   removeLinks: (ids: string[]) => void;
   /** Apply a sequenced server delta; stale packets (seq <= lastSeq) are dropped. */
   applyDelta: (delta: GraphDelta) => boolean;
-  /** React Flow change handler (controlled mode). Applies measured dimensions
-   * and selection into the store; position/remove stay sim-owned and are ignored. */
+  /** React Flow change handler (controlled mode). Applies measured dimensions,
+   * user drag positions, and selection into the store; removes stay sim-owned
+   * and are ignored. Server ticks only overwrite nodes listed in the delta,
+   * so a dragged node keeps its position until the sim moves it. */
   applyNodeChanges: (changes: NodeChange[]) => void;
   selectNode: (id: string | null) => void;
   setNodeStatus: (id: string, status: NodeStatus) => void;
@@ -218,22 +220,33 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     // undefined = no selection change seen yet this batch.
     let selected: string | null | undefined;
     const dims = new Map<string, { width: number; height: number }>();
+    const moves = new Map<string, { x: number; y: number }>();
     for (const c of changes) {
       if (c.type === "dimensions" && c.dimensions !== undefined) {
         dims.set(c.id, { width: c.dimensions.width, height: c.dimensions.height });
       } else if (c.type === "select") {
         const cur = selected !== undefined ? selected : get().selectedNodeId;
         selected = c.selected ? c.id : cur === c.id ? null : cur;
+      } else if (c.type === "position" && c.position !== undefined) {
+        // User drag: sim-owned layout only overwrites nodes the server
+        // actually lists in a later delta, so the drag persists until then.
+        moves.set(c.id, { x: c.position.x, y: c.position.y });
       }
-      // position/remove are sim-owned: layout comes from the server stream.
+      // remove stays sim-owned: layout/membership comes from the server stream.
     }
-    if (dims.size === 0 && selected === undefined) return;
+    if (dims.size === 0 && selected === undefined && moves.size === 0) return;
     set((s) => {
       const nodes = { ...s.nodes };
       for (const [id, d] of dims) {
         const cur = nodes[id];
         if (cur && (cur.width !== d.width || cur.height !== d.height)) {
           nodes[id] = { ...cur, width: d.width, height: d.height };
+        }
+      }
+      for (const [id, p] of moves) {
+        const cur = nodes[id];
+        if (cur && (cur.x !== p.x || cur.y !== p.y)) {
+          nodes[id] = { ...cur, x: p.x, y: p.y };
         }
       }
       return selected === undefined ? { nodes } : { nodes, selectedNodeId: selected };

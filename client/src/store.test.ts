@@ -71,16 +71,42 @@ describe("graphStore reducers", () => {
     expect(useGraphStore.getState().selectedNodeId).toBeNull();
   });
 
-  it("ignores sim-owned position and remove changes", () => {
+  it("ignores sim-owned remove changes", () => {
     const s = useGraphStore.getState();
     s.upsertNodes([node("a")]);
-    s.applyNodeChanges([
-      { id: "a", type: "position", position: { x: 999, y: 999 } }
-    ]);
     s.applyNodeChanges([{ id: "a", type: "remove" }]);
-    const n = useGraphStore.getState().nodes["a"];
-    expect(n?.x).toBe(1);
-    expect(n).toBeDefined();
+    expect(useGraphStore.getState().nodes["a"]).toBeDefined();
+  });
+
+  it("applies drag positions; untouched siblings keep identity", () => {
+    const s = useGraphStore.getState();
+    s.upsertNodes([node("a"), node("b")]);
+    const bBefore = useGraphStore.getState().nodes["b"];
+    s.applyNodeChanges([{ id: "a", type: "position", position: { x: 50, y: 60 } }]);
+    const st = useGraphStore.getState();
+    expect(st.nodes["a"]?.x).toBe(50);
+    expect(st.nodes["a"]?.y).toBe(60);
+    expect(st.nodes["b"]).toBe(bBefore);
+    // Positions for unknown ids create nothing.
+    s.applyNodeChanges([{ id: "ghost", type: "position", position: { x: 5, y: 5 } }]);
+    expect(useGraphStore.getState().nodes["ghost"]).toBeUndefined();
+  });
+
+  it("drag persists across ticks until the sim moves the node", () => {
+    const s = useGraphStore.getState();
+    s.upsertNodes([node("a"), node("b")]);
+    s.applyNodeChanges([{ id: "a", type: "position", position: { x: 50, y: 60 } }]);
+    // Tick touching only b: drag on a persists.
+    s.applyDelta({ seq: 1, nodesUpsert: [{ ...node("b"), load: 0.9 }] });
+    let st = useGraphStore.getState();
+    expect(st.nodes["a"]?.x).toBe(50);
+    expect(st.nodes["a"]?.y).toBe(60);
+    expect(st.nodes["b"]?.load).toBe(0.9);
+    // Sim moves a: server wins.
+    s.applyDelta({ seq: 2, nodesUpsert: [{ ...node("a"), x: 7, y: 8 }] });
+    st = useGraphStore.getState();
+    expect(st.nodes["a"]?.x).toBe(7);
+    expect(st.nodes["a"]?.y).toBe(8);
   });
 
   it("preserves entity identity for unchanged nodes across upserts and deltas", () => {

@@ -8,7 +8,7 @@ import ReactFlow, {
   Handle,
   Position
 } from "reactflow";
-import { useGraphStore } from "../store/graphStore";
+import { useGraphStore, type TopoNode } from "../store/graphStore";
 
 function SwitchGlyph() {
   return (
@@ -102,26 +102,49 @@ export default function TopologyCanvas({ dark = true }: { dark?: boolean }) {
   const selectedNodeId = useGraphStore((s) => s.selectedNodeId);
   const applyNodeChanges = useGraphStore((s) => s.applyNodeChanges);
   const overlayRef = useRef<HTMLCanvasElement>(null);
-
-  const flowNodes: Node[] = useMemo(
-    () =>
-      nodeIds.map((id) => {
-        const n = nodesById[id];
-        return {
-          id,
-          type: "device",
-          position: { x: n.x, y: n.y },
-          data: { label: n.label, kind: n.kind, status: n.status },
-          // Measured dims unhide nodes (React Flow keeps dim-less nodes
-          // visibility:hidden); selection ring follows the store.
-          width: n.width,
-          height: n.height,
-          selected: id === selectedNodeId,
-          ariaLabel: `${n.kind} ${n.label}`
-        };
-      }),
-    [nodeIds, nodesById, selectedNodeId]
+  // Per-id wrapper cache: the store keeps previous entity refs for
+  // field-equal nodes, so reusing the wrapper (and its data object) here
+  // lets memoized nodes skip re-render on heartbeat ticks.
+  const nodeCacheRef = useRef(
+    new Map<string, { entity: TopoNode; selected: boolean; wrapper: Node }>()
   );
+
+  const flowNodes: Node[] = useMemo(() => {
+    const cache = nodeCacheRef.current;
+    const out: Node[] = [];
+    for (const id of nodeIds) {
+      const n = nodesById[id];
+      if (!n) continue;
+      const sel = id === selectedNodeId;
+      const hit = cache.get(id);
+      if (hit && hit.entity === n && hit.selected === sel) {
+        out.push(hit.wrapper);
+        continue;
+      }
+      const wrapper: Node = {
+        id,
+        type: "device",
+        position: { x: n.x, y: n.y },
+        data: { label: n.label, kind: n.kind, status: n.status },
+        // Measured dims unhide nodes (React Flow keeps dim-less nodes
+        // visibility:hidden); selection ring follows the store.
+        width: n.width,
+        height: n.height,
+        selected: sel,
+        ariaLabel: `${n.kind} ${n.label}`
+      };
+      cache.set(id, { entity: n, selected: sel, wrapper });
+      out.push(wrapper);
+    }
+    // Prune wrappers for removed nodes so the cache can't leak.
+    if (cache.size !== out.length) {
+      const alive = new Set(nodeIds);
+      for (const key of Array.from(cache.keys())) {
+        if (!alive.has(key)) cache.delete(key);
+      }
+    }
+    return out;
+  }, [nodeIds, nodesById, selectedNodeId]);
 
   const flowEdges: Edge[] = useMemo(
     () =>
