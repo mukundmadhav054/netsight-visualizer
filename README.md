@@ -148,7 +148,7 @@ WCAG 2.1 AA items implemented in the client:
 - Keyboard-focusable nodes with visible focus rings.
 - `aria-live` connection status announcements.
 - Telemetry SVGs use `role="img"` with text labels.
-- Dark theme held to at least 4.5:1 text contrast.
+- Both color themes held to at least 4.5:1 text contrast.
 
 ## Contributing
 
